@@ -1,6 +1,105 @@
 import tokenize
 from token import *
 
+DUNDER_SET = {  '__abs__',
+                '__add__',
+                '__aenter__',
+                '__aexit__',
+                '__aiter__',
+                '__and__',
+                '__anext__',
+                '__await__',
+                '__bool__',
+                '__bytes__',
+                '__call__',
+                '__class__',
+                '__cmp__',
+                '__complex__',
+                '__contains__',
+                '__delattr__',
+                '__delete__',
+                '__delitem__',
+                '__delslice__',
+                '__dir__',
+                '__div__',
+                '__divmod__',
+                '__enter__',
+                '__eq__',
+                '__exit__',
+                '__float__',
+                '__floordiv__',
+                '__format__',
+                '__fspath__',
+                '__ge__',
+                '__get__',
+                '__getattribute__',
+                '__getitem__',
+                '__getnewargs__',
+                '__getslice__',
+                '__gt__',
+                '__hash__',
+                '__iadd__',
+                '__iand__',
+                '__import__',
+                '__imul__',
+                '__index__',
+                '__init__',
+                '__init_subclass__',
+                '__instancecheck__',
+                '__int__',
+                '__invert__',
+                '__ior__',
+                '__isub__',
+                '__iter__',
+                '__ixor__',
+                '__le__',
+                '__len__',
+                '__lshift__',
+                '__lt__',
+                '__mod__',
+                '__mul__',
+                '__ne__',
+                '__neg__',
+                '__new__',
+                '__next__',
+                '__nonzero__',
+                '__or__',
+                '__pos__',
+                '__pow__',
+                '__prepare__',
+                '__radd__',
+                '__rand__',
+                '__rdiv__',
+                '__rdivmod__',
+                '__reduce__',
+                '__reduce_ex__',
+                '__repr__',
+                '__reversed__',
+                '__rfloordiv__',
+                '__rlshift__',
+                '__rmod__',
+                '__rmul__',
+                '__ror__',
+                '__round__',
+                '__rpow__',
+                '__rrshift__',
+                '__rshift__',
+                '__rsub__',
+                '__rtruediv__',
+                '__rxor__',
+                '__set__',
+                '__setattr__',
+                '__setitem__',
+                '__setslice__',
+                '__sizeof__',
+                '__str__',
+                '__sub__',
+                '__subclasscheck__',
+                '__subclasses__',
+                '__truediv__',
+                '__xor__'}
+
+
 def functions_tuple(lookup):
     return tuple(x['name'] for x in lookup if x['type'] == 'def_c')
 
@@ -107,7 +206,7 @@ def generate_dict(lookup, name, depth):
             if dictionary['type'] == 'def_c':
                 new_type = 'def'
             elif dictionary['type'] == 'cls_c':
-                new_type = 'clc'
+                new_type = 'cls'
             else:
                 continue
             dct = {'type' : new_type, 'name' : name, 'depth' : depth}
@@ -118,9 +217,18 @@ def convert_lookup(lookup):
     out = list()
     for i, dct in enumerate(lookup):
         dct_aux = {}
+        dct_aux['n'] = i
         dct_aux['type'] = dct['type']
         dct_aux['name'] = dct['name']
         dct_aux['parent'] = dct['depth'][0]
+        # Herencia
+        if 'inheritance' in dct.keys():
+            if dct['inheritance'] is not None:
+                dct_aux['inheritance'] = dct['inheritance']
+        # Es método
+        if 'method_of' in dct.keys():
+            dct_aux['method_of'] = dct['method_of']
+
         if dct['depth'][1] == -1:
             dct_aux['depth'] = 0
         else:
@@ -129,12 +237,12 @@ def convert_lookup(lookup):
                     dct_aux['depth'] = out[j]['depth'] + 1
                     break
         out.append(dct_aux)
-    return tuple(out)
+    return out
 
 ####################
 #####  PARSER  #####
 ####################
-def extract_funcls(file):
+def extract_funcls(file, omit_dunder=False):
     lookup = list()
     with tokenize.open(file) as f:
         tokens = tokenize.generate_tokens(f.readline)
@@ -206,4 +314,13 @@ def extract_funcls(file):
             elif token.string in funcls_tuple(lookup):
                 generate_dict(lookup, token.string, depth[-1])
         i += 1
-    return convert_lookup(lookup)
+    out = convert_lookup(lookup)
+    if omit_dunder:
+        idx_set = set()
+        for i, dct in enumerate(out):
+            if dct['name'] in DUNDER_SET:
+                idx_set.add(i)
+        out = tuple(x for i, x in enumerate(out) if i not in idx_set)
+    else:
+        out = tuple(out)
+    return out
